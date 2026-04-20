@@ -1,0 +1,19 @@
+T3A90 000:000.518   SEGGER J-Link V8.58 Log File
+T3A90 000:000.636   DLL Compiled: Aug  6 2025 12:29:52
+T3A90 000:000.644   Logging started @ 2026-04-16 06:13
+T3A90 000:000.651   Process: C:\Users\USE\.eclipse\com.renesas.platform_1983295112\DebugComp\RA\e2-server-gdb.exe
+T3A90 000:000.664 - 0.658ms 
+T3A90 000:000.702 JLINK_GetDLLVersion()
+T3A90 000:000.712 - 0.010ms returns 85800
+T3A90 000:002.979 JLINK_OpenEx(...)
+T3A90 000:005.628   Looking for J-Link GUI Server exe at: C:\Users\USE\.eclipse\com.renesas.platform_1983295112\DebugComp\RA\ARM\Segger_v8.58.0\JLinkGUIServer.exe
+T3A90 000:005.831   Looking for J-Link GUI Server exe at: \JLinkGUIServer.exe
+T3A90 000:312.451   Failed to connect to J-Link GUI Server.
+T3A90 000:312.486   
+  ***** Error: 
+T3A90 000:312.496   Cannot connect to J-Link.
+T3A90 000:312.618 - 309.640ms returns "Cannot connect to J-Link."
+T3A90 001:892.143 JLINK_Close()
+T3A90 001:893.074 - 0.930ms
+T3A90 001:893.091   
+T3A90 001:893.097   Closed

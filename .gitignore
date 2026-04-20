@@ -1,0 +1,26 @@
+# e2 studio / GCC Build Artifacts
+**/Debug/
+**/Release/
+**/ra_gen/
+**/*.elf
+**/*.srec
+**/*.bin
+**/*.map
+**/*.lst
+
+# Metadata
+**/.settings/
+**/.p64/
+**/.p32/
+**/.p16/
+.metadata/
+FLASH/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary Files
+*.tmp
+*.bak

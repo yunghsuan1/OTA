@@ -1,0 +1,13 @@
+/*
+                  Linker File for Renesas FSP
+*/
+
+INCLUDE memory_regions.lld
+INCLUDE fsp_gen.lld
+
+/* 
+ * 官方 OTA 行為強制修正：
+ * 覆蓋 memory_regions.lld 中的 0x0000 定義。
+ */
+FLASH_START = 0x00008200;
+FLASH_LENGTH = 0x1F7E00; 
