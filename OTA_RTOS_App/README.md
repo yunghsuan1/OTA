@@ -72,3 +72,80 @@
 | v1.0.1 | 2026-04-21 | 修復 FSP 遺漏代碼，實作手動 IP 啟動。 |
 | v1.0.2 | 2026-04-22 | **解決硬體層連線故障**：打通 IOPORT/MSTP/TrustZone；成功 Ping 通 192.168.1.100。 |
 | v1.0.3 | 2026-04-22 | 整理技術文檔，確立 0x8200 穩定版配置。 |
+| v1.0.4 | 2026-04-22 | **新增 OTA 救援架構圖**：確立 S1 Rollback 與 A/B 槽對調邏輯。 |
+
+---
+
+## 5. OTA 更新與救援架構圖 (Architecture Blueprint)
+
+本專案採用 **MCUboot 雙槽對調 (A/B Swap)** 機制，並輔以 **S1 硬體按鈕** 作為緊急救援手段。
+
+### 5.1 完整引導與更新流程
+```mermaid
+graph TD
+    %% 線路定義
+    Power[上電開機 / 系統重置] --> S1{1. 偵測 S1 行為?}
+    
+    %% S1 救援路徑
+    S1 -- "長按住 (救援模式)" --> Rescue[強制執行 Rollback]
+    Rescue --> Swap_Op
+    
+    %% 正常路徑
+    S1 -- "無按住 (正常啟動)" --> HeaderObj{2. 檢查 Slot 1 Header}
+    HeaderObj -- "有新版且校驗通過" --> Swap_Op[3. 執行 A/B 槽對調]
+    HeaderObj -- "無新版 / 校驗失敗" --> Boot0{4. 驗證 Slot 0 健康?}
+    
+    Swap_Op --> Boot0
+    
+    Boot0 -- "MSP/PC 合法" --> Jump[5. 更新 VTOR 並跳轉至 0x8200]
+    Boot0 -- "不合法" --> Halt[系統停擺 / 紅燈閃爍]
+
+    subgraph "Application 運行期 (Slot 0)"
+    Jump --> Run[應用程式正常運作]
+    Run --> Confirm[呼叫 Confirm API: 確認此版本穩定]
+    
+    Run --> Incoming[收到網路 OTA 包]
+    Incoming --> FlashWrite[寫入 Secondary Slot - 1MB 處]
+    FlashWrite --> SetPending[設定下次開機 Pending 旗標]
+    SetPending --> Reboot[執行軟體重置]
+    Reboot --> Power
+    end
+
+    %% 記憶體實體對應
+    subgraph "Flash 實體空間 (2MB)"
+    Addr_0[0x0000: Bootloader]
+    Addr_P[0x8000: Primary Slot - 目前執行位置]
+    Addr_S[0x100000: Secondary Slot - 更新備援下載區]
+    end
+
+    style Swap_Op fill:#f96,stroke-width:2px
+    style FlashWrite fill:#bbf,stroke-width:2px
+    style Addr_P fill:#dfd
+    style Addr_S fill:#fdd
+```
+
+### 5.2 核心安全機制解說
+1.  **S1 按鈕救援 (Manual Rollback)**：當更新後的 App 功能錯誤但未死機時，使用者可透過「開機長按 S1」強行觸發回滾，將 Slot 1 中的舊版穩定程式換回執行區。
+2.  **自動驗證 (Signature Check)**：所有寫入 Slot 1 的資料必須通過 SHA-256 哈希校驗，Bootloader 才會執行對調動作，防止因傳輸中斷導致的死機。
+3.  **試用期機制 (Confirm/Rollback)**：新程式啟動後若未能在時間內呼叫 `Confirm` API 且發生異常重置，Bootloader 會自動判定更新失敗並換回舊版。
+
+---
+
+## 6. 待做項目 (To-Do List)
+
+### 6.1 應用程式端 (App)
+- [ ] **FSP 配置**：加入 `r_flash_hp` (Flash High Performance) 驅動模組。
+- [ ] **網路服務**：實作 TCP Server (Port 5000) 用於接收 OTA 二進位檔。
+- [ ] **Flash 寫入**：實作分塊寫入邏輯，目標位址為 `1MB (0x100000)`。
+- [ ] **資料驗證**：實作 SHA-256 或 CRC 檢查收到的檔案完整性。
+- [ ] **狀態更新**：在重置前標記「更新待處理 (Pending)」旗標。
+
+### 6.2 引導程式端 (Bootloader)
+- [ ] **按鈕偵測**：實作開機時 S1 (P005) 腳位的狀態讀取。
+- [ ] **救援邏輯**：當偵測到 S1 時，強行觸發 Rollback 或維持在 Slot 0。
+- [ ] **對調邏輯 (Swap)**：根據標記執行 Slot 0 與 Slot 1 的實體資料搬移。
+- [ ] **安全性強化**：利用 MCUboot 的 Header 資訊驗證簽章。
+
+### 6.3 測試與工具 (Testing Tools)
+- [ ] **Python 腳本**：撰寫一個電腦端的發送程式，將 `bin` 檔透過 TCP 傳送至板子。
+- [ ] **穩定性測試**：模擬「傳輸中斷」、「燒錄錯誤」等場景，驗證系統恢復能力。
