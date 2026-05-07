@@ -150,56 +150,6 @@
       <property id="config.bsp.common.subclock_stabilization_ms" value="1000"/>
     </config>
   </raBspConfiguration>
-  <raClockConfiguration>
-    <node id="board.clock.xtal.freq" mul="24000000" option="_edit"/>
-    <node id="board.clock.hoco.freq" option="board.clock.hoco.freq.20m"/>
-    <node id="board.clock.loco.freq" option="board.clock.loco.freq.32768"/>
-    <node id="board.clock.moco.freq" option="board.clock.moco.freq.8m"/>
-    <node id="board.clock.subclk.freq" option="board.clock.subclk.freq.32768"/>
-    <node id="board.clock.pll.source" option="board.clock.pll.source.xtal"/>
-    <node id="board.clock.pll.div" option="board.clock.pll.div.3"/>
-    <node id="board.clock.pll.mul" option="board.clock.pll.mul.250"/>
-    <node id="board.clock.pll.display" option="board.clock.pll.display.value"/>
-    <node id="board.clock.pll2.source" option="board.clock.pll2.source.disabled"/>
-    <node id="board.clock.pll2.div" option="board.clock.pll2.div.2"/>
-    <node id="board.clock.pll2.mul" option="board.clock.pll2.mul.200"/>
-    <node id="board.clock.pll2.display" option="board.clock.pll2.display.value"/>
-    <node id="board.clock.clock.source" option="board.clock.clock.source.pll"/>
-    <node id="board.clock.clkout.source" option="board.clock.clkout.source.disabled"/>
-    <node id="board.clock.uclk.source" option="board.clock.uclk.source.disabled"/>
-    <node id="board.clock.u60ck.source" option="board.clock.u60ck.source.disabled"/>
-    <node id="board.clock.octaspiclk.source" option="board.clock.octaspiclk.source.disabled"/>
-    <node id="board.clock.canfdclk.source" option="board.clock.canfdclk.source.disabled"/>
-    <node id="board.clock.cecclk.source" option="board.clock.cecclk.source.disabled"/>
-    <node id="board.clock.iclk.div" option="board.clock.iclk.div.1"/>
-    <node id="board.clock.pclka.div" option="board.clock.pclka.div.2"/>
-    <node id="board.clock.pclkb.div" option="board.clock.pclkb.div.4"/>
-    <node id="board.clock.pclkc.div" option="board.clock.pclkc.div.4"/>
-    <node id="board.clock.pclkd.div" option="board.clock.pclkd.div.2"/>
-    <node id="board.clock.bclk.div" option="board.clock.bclk.div.2"/>
-    <node id="board.clock.bclkout.div" option="board.clock.bclkout.div.2"/>
-    <node id="board.clock.fclk.div" option="board.clock.fclk.div.4"/>
-    <node id="board.clock.clkout.div" option="board.clock.clkout.div.1"/>
-    <node id="board.clock.uclk.div" option="board.clock.uclk.div.5"/>
-    <node id="board.clock.u60ck.div" option="board.clock.u60ck.div.1"/>
-    <node id="board.clock.octaspiclk.div" option="board.clock.octaspiclk.div.1"/>
-    <node id="board.clock.canfdclk.div" option="board.clock.canfdclk.div.6"/>
-    <node id="board.clock.cecclk.div" option="board.clock.cecclk.div.1"/>
-    <node id="board.clock.iclk.display" option="board.clock.iclk.display.value"/>
-    <node id="board.clock.pclka.display" option="board.clock.pclka.display.value"/>
-    <node id="board.clock.pclkb.display" option="board.clock.pclkb.display.value"/>
-    <node id="board.clock.pclkc.display" option="board.clock.pclkc.display.value"/>
-    <node id="board.clock.pclkd.display" option="board.clock.pclkd.display.value"/>
-    <node id="board.clock.bclk.display" option="board.clock.bclk.display.value"/>
-    <node id="board.clock.bclkout.display" option="board.clock.bclkout.display.value"/>
-    <node id="board.clock.fclk.display" option="board.clock.fclk.display.value"/>
-    <node id="board.clock.clkout.display" option="board.clock.clkout.display.value"/>
-    <node id="board.clock.uclk.display" option="board.clock.uclk.display.value"/>
-    <node id="board.clock.u60ck.display" option="board.clock.u60ck.display.value"/>
-    <node id="board.clock.octaspiclk.display" option="board.clock.octaspiclk.display.value"/>
-    <node id="board.clock.canfdclk.display" option="board.clock.canfdclk.display.value"/>
-    <node id="board.clock.cecclk.display" option="board.clock.cecclk.display.value"/>
-  </raClockConfiguration>
   <raComponentSelection>
     <component apiversion="" class="Projects" condition="" group="all" subgroup="common" variant="" vendor="Renesas" version="6.1.0">
       <description>Common source for all template projects.</description>
@@ -442,8 +392,6 @@
       <configSetting altId="cgc0.mode.mainsub" configurationId="cgc0.mode"/>
       <configSetting altId="cgc0.xtal.p213" configurationId="cgc0.xtal"/>
       <configSetting altId="debug0.mode.swd" configurationId="debug0.mode"/>
-      <configSetting altId="debug0.swclk.p300" configurationId="debug0.swclk"/>
-      <configSetting altId="debug0.swdio.p108" configurationId="debug0.swdio"/>
       <configSetting altId="etherc0.rmii.pairing.free" configurationId="etherc0.rmii.pairing"/>
       <configSetting altId="gpt3.gtioca.p111" configurationId="gpt3.gtioca"/>
       <configSetting altId="gpt3.mode.gtiocaorgtiocb.free" configurationId="gpt3.mode"/>
@@ -515,8 +463,6 @@
       <configSetting altId="p107.ospi0.omsio3" configurationId="p107"/>
       <configSetting altId="p107.gpio_speed.gpio_speed_highspeedhigh" configurationId="p107.gpio_drivecapacity"/>
       <configSetting altId="p107.gpio_mode.gpio_mode_peripheral" configurationId="p107.gpio_mode"/>
-      <configSetting altId="p108.debug0.swdio" configurationId="p108"/>
-      <configSetting altId="p108.gpio_mode.gpio_mode_peripheral" configurationId="p108.gpio_mode"/>
       <configSetting altId="p111.gpt3.gtioca" configurationId="p111"/>
       <configSetting altId="p111.gpio_speed.gpio_speed_high" configurationId="p111.gpio_drivecapacity"/>
       <configSetting altId="p111.gpio_mode.gpio_mode_peripheral" configurationId="p111.gpio_mode"/>
@@ -554,8 +500,6 @@
       <configSetting altId="p212.gpio_mode.gpio_mode_peripheral" configurationId="p212.gpio_mode"/>
       <configSetting altId="p213.cgc0.xtal" configurationId="p213"/>
       <configSetting altId="p213.gpio_mode.gpio_mode_peripheral" configurationId="p213.gpio_mode"/>
-      <configSetting altId="p300.debug0.swclk" configurationId="p300"/>
-      <configSetting altId="p300.gpio_mode.gpio_mode_peripheral" configurationId="p300.gpio_mode"/>
       <configSetting altId="p301.spi0.ssl2" configurationId="p301"/>
       <configSetting altId="p301.gpio_speed.gpio_speed_high" configurationId="p301.gpio_drivecapacity"/>
       <configSetting altId="p301.gpio_mode.gpio_mode_peripheral" configurationId="p301.gpio_mode"/>
@@ -728,12 +672,6 @@
     </pincfg>
     <pincfg active="false" name="R7FA6M5BH3CFC.pincfg" selected="false" symbol="">
       <configSetting altId="debug0.mode.swd" configurationId="debug0.mode"/>
-      <configSetting altId="debug0.swclk.p300" configurationId="debug0.swclk"/>
-      <configSetting altId="debug0.swdio.p108" configurationId="debug0.swdio"/>
-      <configSetting altId="p108.debug0.swdio" configurationId="p108"/>
-      <configSetting altId="p108.gpio_mode.gpio_mode_peripheral" configurationId="p108.gpio_mode"/>
-      <configSetting altId="p300.debug0.swclk" configurationId="p300"/>
-      <configSetting altId="p300.gpio_mode.gpio_mode_peripheral" configurationId="p300.gpio_mode"/>
     </pincfg>
   </raPinConfiguration>
 </raConfiguration>

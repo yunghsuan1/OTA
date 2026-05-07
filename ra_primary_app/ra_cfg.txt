@@ -50,11 +50,11 @@ FSP Configuration
     OFS Registers: OFS0 (Option Function Select Register 0) Settings: WDT: Stop Control: Stop counting when entering Sleep mode
     OFS Registers: DUALSEL (Dual Mode Select Register) Settings: Disabled
     OFS Registers: DUALSEL (Dual Mode Select Register) Settings: Bank Mode: Linear
-    OFS Registers: OFS1 (Option Function Select Register 1) Settings: Disabled
+    OFS Registers: OFS1 (Option Function Select Register 1) Settings: Enabled
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: Voltage Detection 0 Circuit Start: Voltage monitor 0 reset is disabled after reset
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: Voltage Detection 0 Level: 2.80 V
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: HOCO Oscillation Enable: HOCO oscillation is disabled after reset
-    OFS Registers: BANKSEL (Bank Select Register) Settings: Disabled
+    OFS Registers: BANKSEL (Bank Select Register) Settings: Enabled
     OFS Registers: BANKSEL (Bank Select Register) Settings: Startup Bank Switch: Disabled
     OFS Registers: BANKSEL (Bank Select Register) Settings: Block Swap Select: Disabled
     OFS Registers: BPS (Block Protect Setting Register) Settings: Disabled
@@ -695,7 +695,7 @@ FSP Configuration
     Enable IPV6: Disable
     Print info messages: Disable
     Byte order of the target MCU: pdFREERTOS_LITTLE_ENDIAN 
-    IP/TCP/UDP checksums: Enable 
+    IP/TCP/UDP checksums: Disable
     Receive Block Time: 2000
     Send Block Time: 2000
     DNS caching: Enable 
@@ -713,7 +713,7 @@ FSP Configuration
     ARP Request Retransmissions: 5
     Maximum time before ARP table entry becomes stale: 150
     Use string for IP Address: Enable 
-    Total number of available network buffers: 16
+    Total number of available network buffers: 32
     Set the maximum number of events: ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS + 5
     Enable FreeRTOS_sendto() without calling Bind: Disable
     TTL values for UDP packets: 128
@@ -771,7 +771,7 @@ FSP Configuration
   Module "Flash (r_flash_hp)"
     Parameter Checking: Default (BSP)
     Code Flash Programming Enable: Enabled
-    Data Flash Programming Enable: Disabled
+    Data Flash Programming Enable: Enabled
     
   FreeRTOS
     General: Custom FreeRTOSConfig.h: 
@@ -877,8 +877,8 @@ FSP Configuration
           Filters: Multicast Mode: Enable
           Filters: Promiscuous Mode: Disable
           Filters: Broadcast filter: 0
-          Buffers: Number of TX buffer: 4
-          Buffers: Number of RX buffer: 4
+          Buffers: Number of TX buffer: 16
+          Buffers: Number of RX buffer: 16
           Buffers: Allocate RX buffer: Enable
           Buffers: Buffer size: 1514
           Buffers: Padding size: Disable
@@ -910,8 +910,8 @@ FSP Configuration
     Instance "FreeRTOS Heap 4"
     Instance "g_flash0 Flash (r_flash_hp)"
       Name: g_flash0
-      Data Flash Background Operation: Disabled
-      Callback: NULL
-      Flash Ready Interrupt Priority: Disabled
-      Flash Error Interrupt Priority: Disabled
+      Data Flash Background Operation: Enabled
+      Callback: flash_0_cb
+      Flash Ready Interrupt Priority: Priority 2
+      Flash Error Interrupt Priority: Priority 2
       

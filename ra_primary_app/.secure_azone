@@ -24,6 +24,8 @@
         <peripheral name="ETHERC0.CM33" group="ETHERC" security="s"/>
         <peripheral name="ICU.CM33">
             <slot name="IRQ0.CM33" secure="true"/>
+            <slot name="IRQ1.CM33" secure="true"/>
+            <slot name="IRQ2.CM33" secure="true"/>
         </peripheral>
     </partition>
 </azone>
