@@ -99,12 +99,8 @@
         </peripheral>
         <peripheral name="PORT4.CM33" group="PORT">
             <slot name="P400.CM33" secure="true"/>
-            <slot name="P401.CM33" secure="true"/>
-            <slot name="P402.CM33" secure="true"/>
             <slot name="P403.CM33" secure="true"/>
             <slot name="P404.CM33" secure="true"/>
-            <slot name="P405.CM33" secure="true"/>
-            <slot name="P406.CM33" secure="true"/>
             <slot name="P407.CM33" secure="true"/>
             <slot name="P408.CM33" secure="true"/>
             <slot name="P409.CM33" secure="true"/>
@@ -136,12 +132,6 @@
             <slot name="P615.CM33" secure="true"/>
         </peripheral>
         <peripheral name="PORT7.CM33" group="PORT">
-            <slot name="P700.CM33" secure="true"/>
-            <slot name="P701.CM33" secure="true"/>
-            <slot name="P702.CM33" secure="true"/>
-            <slot name="P703.CM33" secure="true"/>
-            <slot name="P704.CM33" secure="true"/>
-            <slot name="P705.CM33" secure="true"/>
             <slot name="P706.CM33" secure="true"/>
             <slot name="P707.CM33" secure="true"/>
             <slot name="P708.CM33" secure="true"/>

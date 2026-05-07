@@ -73,6 +73,8 @@ extern rm_freertos_plus_tcp_instance_t * gp_freertos_plus_tcp_instance;
 /***********************************************************************************************************************
  * Private global variables
  **********************************************************************************************************************/
+/* HACK: Global flag to notify application of received packets */
+volatile uint8_t g_packet_received = 0;
 
 /***********************************************************************************************************************
  * Exported global function
@@ -398,6 +400,10 @@ static BaseType_t prvNetworkInterfaceInput (NetworkInterface_t * pxInterface) {
                      * Call the standard trace macro to log the occurrence. */
                     iptraceNETWORK_INTERFACE_RECEIVE();
                     xResult = pdPASS;
+                    
+                    /* Notify the application that a packet was received */
+                    extern volatile uint8_t g_packet_received;
+                    g_packet_received = 1;
                 }
             }
         }

@@ -93,6 +93,8 @@ FSP_HEADER
 
 extern const ioport_cfg_t g_bsp_pin_cfg; /* RA6M5 EK */
 
+extern const ioport_cfg_t g_bsp_pin_cfg0; /* New Configuration */
+
 void BSP_PinConfigSecurityInit();
 
 /* Common macro for FSP header files. There is also a corresponding FSP_HEADER macro at the top of this file. */
