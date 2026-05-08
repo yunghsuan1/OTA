@@ -103,8 +103,25 @@ static rm_mcuboot_port_flush_buffer_t * gp_flush_buffer_lookup[2] =
 };
 #endif
 
-#define FLASH_MAP_C
+// We do NOT define FLASH_MAP_C here to avoid defining the default flash_map
 #include "bsp_linker_info.h"
+
+/* --- 手動覆蓋 Slot 2 位址，繞過 e2 studio 2MB 限制 --- */
+static const struct flash_area flash_map[] =
+{
+    {
+        .fa_id        = FLASH_AREA_0P_ID,
+        .fa_device_id = FLASH_DEVICE_INTERNAL_FLASH,
+        .fa_off       = BSP_PARTITION___BL_0_P_H_START,
+        .fa_size      = BSP_PARTITION___BL_0_P_H_SIZE + BSP_PARTITION_FLASH_CPU0_S_SIZE,
+    },
+    {
+        .fa_id        = FLASH_AREA_0S_ID,
+        .fa_device_id = FLASH_DEVICE_INTERNAL_FLASH,
+        .fa_off       = 0x200000, /* 👈 強行導向 Bank 1 起點 */
+        .fa_size      = BSP_PARTITION___BL_0_S_H_SIZE + BSP_PARTITION___BL_0_S_I_SIZE + BSP_PARTITION_FLASH_CPU0_C_SIZE,
+    },
+};
 
 static const struct flash_area * prv_lookup_flash_area(int id);
 

@@ -156,3 +156,32 @@ python ota_client.py 192.168.1.100 your_firmware.bin
 - **Solution**: 
     1. **Solution 關聯斷開**：在 e2 studio 中，簽署腳本通常與 Solution 專案的 Build 動作綁定。若單獨 Build 子專案，不會觸發 Post-build 步驟。
     2. **重新建立鏈結**：對著 Application 專案的 `configuration.xml` 重新點擊 **Generate Project Content**，然後務必**對著最外層的「Solution 專案」點擊右鍵 -> 選擇 Build Project**，即可成功觸發 Python 簽署腳本，產生最新的 `.bin.signed`。
+
+
+名稱SmartBundle
+類型:檔案
+值:${workspace_loc:/ra_mcuboot}/${ConfigName}/ra_mcuboot.sbd
+
+- **Problem**: **[Solution] e2 studio 的 `solution.xml` 限制 Flash 總大小為 2MB，無法將 Slot 2 設在物理起點 `0x200000`。**
+- **Solution**: 
+    1. **程式碼強行導正**：在 `ra_mcuboot` 專案中的 `flash_map.c` 檔案裡，取消自動 include `flash_map` 陣列，並手動寫死一個 `flash_map`。
+    2. **位址覆蓋**：將 `FLASH_AREA_0S_ID` (Slot 2) 的起點 `.fa_off` 強行設定為 **`0x200000`**，完美繞過工具限制！
+
+---
+
+## 🎉 實戰驗證：App 1 成功接收並驗證 App 2！ (2026-05-08)
+
+我們成功在不依賴 Bootloader 跳轉的情況下，驗證了最核心的「接收與寫入」流程：
+
+### 1. 驗證機制升級
+*   將 App 1 的驗證方式從檢查死板的字串，升級為**檢查 MCUboot 官方的 Magic Number (`0x96f3b83d`)**。
+*   將寫入位址鎖定在 **`0x200000`**（Bank 1 起點）。
+
+### 2. 測試過程
+1.  **產生 App 2**：將 App 版本切換至 2（開啟跑馬燈功能），編譯並產生 `ra_primary_app.bin.signed`，存放在 `app2/` 資料夾。
+2.  **降回 App 1**：將 App 版本切換回 1，並修改 `fsp.lld` 覆蓋 `FLASH_START = 0x0` 以便 Debug。
+3.  **網路傳送**：執行 `python ota_client.py`（已預設路徑），自動將 `app2` 丟給正在運行的板子。
+
+### 3. 亮麗結果
+*   傳送完成後，板子**成功亮起三顆燈 5 秒**！
+*   這代表：App 1 成功接收完整檔案、成功寫入 `0x200000`，且**成功辨識出這是合法的 MCUboot 簽署影像**！

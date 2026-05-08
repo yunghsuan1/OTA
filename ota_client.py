@@ -48,7 +48,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         target_ip = sys.argv[1]
     
-    file_to_send = None
+    file_to_send = r"C:\Users\USE\Desktop\SEAN_CODE\OTA\app2\ra_primary_app.bin.signed"
     if len(sys.argv) > 2:
         file_to_send = sys.argv[2]
 
