@@ -4,7 +4,7 @@
 #include <string.h>
 
 /* --- OTA 設定 --- */
-#define OTA_FLASH_START_ADDR  (0x080000)  /* OTA 韌體存放起點 (512KB 處) */
+#define OTA_FLASH_START_ADDR  (0x210000)  /* OTA 韌體存放起點 (Bank 1 內部位址) */
 #define FLASH_BLOCK_SIZE      (32768)     /* RA6M5 大區塊為 32KB */
 
 /* --- LED 控制 (遵循測試成功的 P006=藍燈, P007=綠燈 邏輯) --- */
@@ -12,6 +12,14 @@
 #define LED_BLUE_OFF   R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06, BSP_IO_LEVEL_LOW)
 #define LED_GREEN_ON   R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_HIGH)
 #define LED_GREEN_OFF  R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_LOW)
+
+/* --- Flash 診斷變數 --- */
+volatile fsp_err_t g_flash_open_err = 0;
+volatile fsp_err_t g_flash_erase_err = 0;
+volatile fsp_err_t g_flash_write_err = 0;
+volatile uint32_t g_fstatr = 0;   
+volatile uint32_t g_fawmon = 0;   
+volatile uint32_t g_fbankmon = 0; 
 
 /* --- 診斷與緩存 --- */
 static uint8_t g_ota_buffer[4096]; /* 接收快取 */
@@ -52,8 +60,8 @@ void new_thread0_entry(void *pvParameters)
     R_BSP_SoftwareDelay(1000, BSP_DELAY_UNITS_MILLISECONDS);
 
     /* 3. 初始化 Flash */
-    err = R_FLASH_HP_Open(&g_flash0_ctrl, &g_flash0_cfg);
-    if (FSP_SUCCESS != err) while(1);
+    g_flash_open_err = R_FLASH_HP_Open(&g_flash0_ctrl, &g_flash0_cfg);
+    if (FSP_SUCCESS != g_flash_open_err) while(1);
 
     /* 4. 初始化網路並等待 IP */
     static uint8_t ucMACAddress[6] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
@@ -96,17 +104,17 @@ void new_thread0_entry(void *pvParameters)
                     if (u32WriteAddr % FLASH_BLOCK_SIZE == 0)
                     {
                         __disable_irq();
-                        R_FLASH_HP_Erase(&g_flash0_ctrl, u32WriteAddr, 1);
+                        g_flash_erase_err = R_FLASH_HP_Erase(&g_flash0_ctrl, u32WriteAddr, 1);
                         __enable_irq();
                     }
 
                     /* 寫入 Flash (長度對齊 128) */
                     uint32_t u32WriteLen = (uint32_t)((lBytesReceived + 127) & ~127);
                     __disable_irq();
-                    err = R_FLASH_HP_Write(&g_flash0_ctrl, (uint32_t)g_ota_buffer, u32WriteAddr, u32WriteLen);
+                    g_flash_write_err = R_FLASH_HP_Write(&g_flash0_ctrl, (uint32_t)g_ota_buffer, u32WriteAddr, u32WriteLen);
                     __enable_irq();
 
-                    if (FSP_SUCCESS == err) {
+                    if (FSP_SUCCESS == g_flash_write_err) {
                         u32WriteAddr += u32WriteLen;
                     }
                     
@@ -114,7 +122,24 @@ void new_thread0_entry(void *pvParameters)
                 }
                 else if (lBytesReceived < 0)
                 {
+                    /* 連線中斷，代表傳送結束 */
                     FreeRTOS_closesocket( xConnectedSocket );
+                    
+                    /* --- 自動驗證：讀取開頭 15 Bytes --- */
+                    if (0 == memcmp((void *)OTA_FLASH_START_ADDR, "RA6M5_OTA_TEST_", 15))
+                    {
+                        /* 驗證成功：三燈齊亮 5 秒 */
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06, BSP_IO_LEVEL_HIGH);
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_HIGH);
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08, BSP_IO_LEVEL_HIGH);
+                        
+                        vTaskDelay(pdMS_TO_TICKS(5000));
+                        
+                        /* 熄滅 */
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06, BSP_IO_LEVEL_LOW);
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_LOW);
+                        R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08, BSP_IO_LEVEL_LOW);
+                    }
                     break;
                 }
             }

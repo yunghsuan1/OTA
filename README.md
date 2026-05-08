@@ -105,7 +105,8 @@ python ota_client.py 192.168.1.100 your_firmware.bin
 
 ### 3. 驗證方式
 *   傳送時，板子 **藍燈 (P006)** 會閃爍。
-*   傳送完成後，在 e2 studio 中檢查位址 `0x080000` 即可看到資料。
+*   傳送完成後，板子會自動讀取開頭資料。如果正確，**紅綠藍三燈會齊亮 5 秒**。
+*   在 e2 studio 中檢查位址 **`0x200000`** 或 **`0x210000`** 即可看到資料。
 
 ---
 
@@ -122,6 +123,6 @@ python ota_client.py 192.168.1.100 your_firmware.bin
 - **Problem**: **[Flash] 調用 R_FLASH_HP_Erase 報錯 FSP_ERR_ERASE_FAILED (0x10004)。**
 - **Solution**: 
     1. **硬體權限解鎖**：RA6M5 硬體預設鎖定 Flash 控制器，需手動解鎖 `PSARA` (bit 10) 暫存器權限。
-    2. **位址斷層避讓**：在 Dual Mode 模式下，1MB 邊界處 (`0x100000`) 為位址斷層，改用 `0x080000` (512KB) 或正確對齊 Bank 位址。
+    2. **位址斷層避讓與 Dual Mode 證實**：在實測中，`0x100000` ~ `0x1FFFFF` 區間寫入會失敗。查閱手冊證實晶片處於 **Dual Mode**，Bank 1 的實際起點為 **`0x200000`**。改寫 `0x200000` 後成功解決此問題！
     3. **中斷保護**：在執行 Code Flash P/E 期間必須關閉中斷 (`__disable_irq`) 防止 CPU 存取異常。
     4. **診斷驗證**：透過 `FAWMON` 監控門鎖狀態，確認 `FAWEN` 位元為 1 (Disabled) 以確保門鎖未關閉。
