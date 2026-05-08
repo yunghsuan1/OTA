@@ -4,12 +4,13 @@
 
 ---
 
-## 💡 目前狀態：Debug-Flat 模式 (開發中)
-為了方便開發 App 邏輯（如乙太網路、感測器等），目前的 App 設定為 **直接從 0x0 啟動**，跳過了 Bootloader。
+## 💡 目前狀態：OTA 模式已成功跑通！ 🎉
+目前已成功實現 **MCUboot 跳轉 App**，且 App 能正常啟動網路並透過 8080 Port 接收資料寫入 Flash！
 
-- **App 位址**: `0x00000000`
-- **中斷向量表**: `0x00000000`
-- **SmartBundle**: 已移除 (不連動 Bootloader 設定)
+- **Bootloader 位址**: `0x00000000`
+- **App 起點 (Slot 1)**: `0x00008000`
+- **App 向量表起點**: `0x00008100`
+- **SmartBundle**: 已正確連動
 
 ---
 
@@ -37,6 +38,24 @@
 ### 4. 燒錄驗證 (RFP)
 - `ra_mcuboot.srec` -> 位址 `0x0`
 - `ra_primary_app.bin.signed` -> 位址 **`0x8000`**
+
+---
+
+## ↩️ 如何切換回 Debug-Flat 模式 (跳過 Bootloader)
+如果您需要單獨開發 App 邏輯，想跳過 Bootloader 直接從 `0x0` 啟動，請執行以下步驟：
+
+1. **移除 SmartBundle 連動**：
+   - 進入 `ra_primary_app` 專案屬性 -> **C/C++ Build** -> **Build Variables**。
+   - 移除 `SmartBundle` 變數。
+2. **修改記憶體分區**：
+   - 將 App 的 `FLASH_START` 設回 `0x00000000`。
+3. **重新編譯**：
+   - 按 **Generate Project Content** 並重新 Build。
+
+*這時的狀態會是：*
+- **App 位址**: `0x00000000`
+- **中斷向量表**: `0x00000000`
+- **SmartBundle**: 已移除 (不連動 Bootloader 設定)
 
 ---
 
@@ -126,3 +145,14 @@ python ota_client.py 192.168.1.100 your_firmware.bin
     2. **位址斷層避讓與 Dual Mode 證實**：在實測中，`0x100000` ~ `0x1FFFFF` 區間寫入會失敗。查閱手冊證實晶片處於 **Dual Mode**，Bank 1 的實際起點為 **`0x200000`**。改寫 `0x200000` 後成功解決此問題！
     3. **中斷保護**：在執行 Code Flash P/E 期間必須關閉中斷 (`__disable_irq`) 防止 CPU 存取異常。
     4. **診斷驗證**：透過 `FAWMON` 監控門鎖狀態，確認 `FAWEN` 位元為 1 (Disabled) 以確保門鎖未關閉。
+
+- **Problem**: **[Bootloader] 燒錄後藍燈一直閃爍，App 沒有正常啟動。**
+- **Solution**: 
+    1. **向量表偏移**：App 被編譯在 `0x0`，但實際燒錄在 `0x8000`。透過在 `solution.xml` 中正確設定分區，並使用「對著 Solution 專案點擊右鍵 -> Build Project」的方式，讓 FSP 自動生成正確的 `FLASH_START = 0x8100` 導正位址。
+    2. **堆疊指標 (Stack Pointer) 衝突**：初始堆疊指標被設為 `0x20008000`（RAM 起點），導致堆疊向下生長時踩到 Bootloader。透過修正 `RAM_START` 或是透過 Solution 自動分配，確保堆疊指標在正確的位置。
+    3. **TrustZone 邊界衝突**：GDB 顯示晶片處於 SSD 狀態且保留了 64KB Secure Flash。將 App 放在 `0x8000` 剛好落在安全區，導致權限錯誤。未來可能需要將晶片安全區域設為 0 或將 App 後移。
+
+- **Problem**: **[Build] 雖然編譯成功，但 `ra_primary_app.bin.signed` 檔案時間停留在過去，沒有更新。**
+- **Solution**: 
+    1. **Solution 關聯斷開**：在 e2 studio 中，簽署腳本通常與 Solution 專案的 Build 動作綁定。若單獨 Build 子專案，不會觸發 Post-build 步驟。
+    2. **重新建立鏈結**：對著 Application 專案的 `configuration.xml` 重新點擊 **Generate Project Content**，然後務必**對著最外層的「Solution 專案」點擊右鍵 -> 選擇 Build Project**，即可成功觸發 Python 簽署腳本，產生最新的 `.bin.signed`。
