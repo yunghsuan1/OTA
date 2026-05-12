@@ -6,6 +6,13 @@
 #define OFS_WDT  (1 << 17 | 3 << 18 | 15 << 20 | 3 << 24 | 3 << 26 | 1 << 28 | 1 << 30)
 #define BSP_CFG_OPTION_SETTING_OFS0  (OFS_IWDT | OFS_WDT)
 #endif
+/* Dual Mode Select Register */
+#ifndef BSP_CFG_OPTION_SETTING_DUALSEL
+#define BSP_CFG_OPTION_SETTING_DUALSEL  (0xFFFFFFF8U | 0U)
+#endif
+#ifndef BSP_CFG_OPTION_SETTING_BANKSEL
+#define BSP_CFG_OPTION_SETTING_BANKSEL  ( 0xFFF8U | (0xFFFFU << 16))
+#endif
 #ifndef BSP_CFG_OPTION_SETTING_OFS1_SEC
 #define BSP_CFG_OPTION_SETTING_OFS1_SEC_NO_HOCOFRQ (0xFFFFF8F8 | (1 <<2) | (3) | (1 << 8))
 

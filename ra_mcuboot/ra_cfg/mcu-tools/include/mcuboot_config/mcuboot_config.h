@@ -11,7 +11,7 @@ extern "C" {
 #define MCUBOOT_SIGN_RSA
 #endif
 
-#define MCUBOOT_OVERWRITE_ONLY
+#define MCUBOOT_DIRECT_XIP
 #ifdef MCUBOOT_OVERWRITE_ONLY_FAST
 #define MCUBOOT_OVERWRITE_ONLY
 #endif
@@ -63,8 +63,6 @@ extern "C" {
 #endif
 
 #define MCUBOOT_VALIDATE_PRIMARY_SLOT
-
-#define MCUBOOT_DOWNGRADE_PREVENTION
 
 #define MCUBOOT_DUALBANK_FLASH_LP (0)
 

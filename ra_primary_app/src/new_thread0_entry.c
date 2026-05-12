@@ -7,9 +7,10 @@
 #define CURRENT_APP_VERSION 1 /* 1: 舊版 (原功能), 2: 新版 (跑馬燈功能) */
 
 /* --- OTA 設定 --- */
-#define OTA_FLASH_START_ADDR (0x200000) /* OTA 韌體存放起點 (Bank 1 內部位址) \
-                                         */
-#define FLASH_BLOCK_SIZE (32768)        /* RA6M5 大區塊為 32KB */
+#define OTA_FLASH_START_ADDR                                                   \
+  (0x200000)                     /* OTA 韌體存放起點 (Bank 1 內部位址)       \
+                                  */
+#define FLASH_BLOCK_SIZE (32768) /* RA6M5 大區塊為 32KB */
 
 /* --- LED 控制 (遵循測試成功的 P006=藍燈, P007=綠燈 邏輯) --- */
 #define LED_BLUE_ON                                                            \
@@ -132,6 +133,23 @@ void new_thread0_entry(void *pvParameters) {
                                        sizeof(g_ota_buffer), 0);
 
         if (lBytesReceived > 0) {
+          /* --- 支援網路指令：清除 Bank 1 --- */
+          if (lBytesReceived == 5 && memcmp(g_ota_buffer, "ERASE", 5) == 0) {
+            LED_BLUE_ON;
+            __disable_irq();
+            /* 擦除 0x200000 開始的 31 個 32KB 區塊 (共 992KB) */
+            g_flash_erase_err =
+                R_FLASH_HP_Erase(&g_flash0_ctrl, OTA_FLASH_START_ADDR, 31);
+            __enable_irq();
+            LED_BLUE_OFF;
+
+            if (FSP_SUCCESS == g_flash_erase_err) {
+              FreeRTOS_send(xConnectedSocket, "ERASE_OK", 8, 0);
+            } else {
+              FreeRTOS_send(xConnectedSocket, "ERASE_ERR", 9, 0);
+            }
+            continue; /* 繼續等待資料或斷線 */
+          }
           LED_BLUE_ON; /* 寫入時藍燈亮 */
 
           /* 每到區塊邊界就自動擦除 32KB */
@@ -163,6 +181,27 @@ void new_thread0_entry(void *pvParameters) {
           /* --- 自動驗證：檢查 MCUboot 簽署檔的 Magic Number --- */
           uint32_t *p_magic = (uint32_t *)OTA_FLASH_START_ADDR;
           if (*p_magic == 0x96f3b83d) {
+            /* --- 寫入 MCUboot 更新標記 (Trailer) --- */
+            uint8_t trailer_buf[128];
+            uint32_t trailer_addr = OTA_FLASH_START_ADDR + 0xF8000 - 128;
+            memcpy(trailer_buf, (void *)trailer_addr, 128);
+
+            uint8_t magic[16] = {0x77, 0xc4, 0x3c, 0x09, 0x04, 0xa6,
+                                 0x12, 0x03, 0x8f, 0x8d, 0x28, 0xb9,
+                                 0x5b, 0xa4, 0xa9, 0x86};
+            memcpy(&trailer_buf[128 - 16], magic, 16);
+
+            /* 補上 Image OK 旗標 (倒數第 17 byte) */
+            trailer_buf[128 - 17] = 0x01;
+            
+            /* 補上 Swap Info 旗標 (倒數第 19 byte)，設為 0x01 代表 Test */
+            trailer_buf[128 - 19] = 0x01;
+
+            __disable_irq();
+            g_flash_write_err = R_FLASH_HP_Write(
+                &g_flash0_ctrl, (uint32_t)trailer_buf, trailer_addr, 128);
+            __enable_irq();
+
             /* 驗證成功：三燈齊亮 5 秒 */
             R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06,
                               BSP_IO_LEVEL_HIGH);
