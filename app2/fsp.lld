@@ -1,0 +1,10 @@
+/*
+                  Linker File for Renesas FSP
+*/
+
+INCLUDE memory_regions.lld
+
+/* 強行覆蓋 FSP 產生的起始位址，改為 Slot 2 的起點 */
+FLASH_START = 0x100100;
+
+INCLUDE fsp_gen.lld

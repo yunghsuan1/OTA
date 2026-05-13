@@ -88,7 +88,8 @@ void mcuboot_quick_setup()
         R_BSP_SoftwareDelay(1, BSP_DELAY_UNITS_SECONDS);
         
         /* 強制指回 App 1 的起點 (0x8000) */
-        rsp.br_hdr = NULL;
+        /* 指向 0x8000 處的 Header，以便 BootApp 讀取正確的 header_size (0x100) */
+        rsp.br_hdr = (void *)0x8000; 
         rsp.br_flash_dev_id = 127;
         rsp.br_image_off = 0x8000; 
         

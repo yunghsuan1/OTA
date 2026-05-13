@@ -4,13 +4,52 @@
 
 ---
 
-## 💡 目前狀態：OTA 模式已成功跑通！ 🎉
-目前已成功實現 **MCUboot 跳轉 App**，且 App 能正常啟動網路並透過 8080 Port 接收資料寫入 Flash！
+## 💡 目前狀態：全功能 OTA 模式與 Direct XIP 已成功跑通！ 🎉🎉
+目前已成功實現：
+1. **MCUboot 跳轉 App**（Slot 1 `0x8000`）。
+2. **App 1 透過網路接收 App 2** 並寫入 Slot 2 (`0x100000`)。
+3. **MCUboot 驗證 Slot 2 成功**，並以 **Direct XIP (原地執行)** 模式成功跳轉至 `0x100100` 執行 App 2 (跑馬燈)！
+4. **S1 防磚按鍵救援**功能實測成功，可隨時強制切回 App 1！
 
 - **Bootloader 位址**: `0x00000000`
-- **App 起點 (Slot 1)**: `0x00008000`
-- **App 向量表起點**: `0x00008100`
-- **SmartBundle**: 已正確連動
+- **App 1 起點 (Slot 1)**: `0x00008000` (向量表 `0x8100`)
+- **App 2 起點 (Slot 2)**: `0x00100000` (向量表 `0x100100`)
+
+---
+
+## 📖 完整操作流程 (Direct XIP 與 防磚測試)
+
+### 流程 A：App 2 升級測試 (Direct XIP 模式)
+當您要從 App 1 升級到 App 2，且希望維持 Direct XIP（不搬移韌體）時，請執行以下步驟：
+
+1. **準備 App 2 原始碼**：
+   - 在 `ra_primary_app/src/new_thread0_entry.c` 中，將 `#define CURRENT_APP_VERSION` 改為 **`2`**（啟用跑馬燈）。
+2. **修改編譯位址 (關鍵)**：
+   - 在 `ra_primary_app/script/fsp.lld` 的 `INCLUDE memory_regions.lld` 後方，加上：
+     ```lld
+     FLASH_START = 0x100100;
+     ```
+3. **編譯與簽署**：
+   - 在 e2 studio 中對著 **Solution 專案** 點擊右鍵 -> **Build Project**。
+   - 確認產生的 `ra_primary_app.bin.signed` 檔案時間有更新。
+4. **網路傳送**：
+   - 啟動板子上的 App 1（綠燈亮）。
+   - 執行 Python UI，將簽署好的檔案傳送過去。
+5. **重啟驗證**：
+   - 檔案傳送完畢後，等待 5 秒超時，板子會自動計算 CRC 並重置。
+   - MCUboot 啟動，從 UART Log 會看到 `Image 0 loaded from the secondary slot`，並跳轉至 `0x100100`。
+   - **結果**：板子開始閃爍跑馬燈！
+
+---
+
+### 流程 B：S1 按鍵強制救援 (Fallback) 測試
+如果 App 2 寫爛了，或是您想手動切回 App 1：
+
+1. **按下 S1**：在板子上電或按下 Reset 的**瞬間**，按住板子上的 **S1 按鍵** (P005)。
+2. **觀察燈號與 Log**：
+   - 板子會亮起**紅藍齊亮**燈號約 1 秒。
+   - UART Log 會印出 `[WARN] S1 Pressed! Forced Fallback to App 1...`。
+   - MCUboot 會跳過 Slot 2，直接跳轉至 `0x8000` (App 1) 執行！
 
 ---
 
@@ -68,32 +107,27 @@ graph TD
     Power[上電啟動 / 系統重置] --> S1{1. 偵測 S1 行為?}
     
     %% S1 救援路徑
-    S1 -- "長按模式 (救援模式)" --> Rescue[執行強制 Rollback]
-    Rescue --> Swap_Op
+    S1 -- "按住 S1 (救援模式)" --> Rescue[執行強制 Fallback]
+    Rescue --> JumpApp1[跳轉至 0x8100]
     
     %% 正常路徑
-    S1 -- "短按模式 (正常啟動)" --> HeaderObj{2. 檢查 Slot 1 Header}
-    HeaderObj -- "新韌體待更新" --> Swap_Op[3. 執行 A/B 槽位對調]
-    HeaderObj -- "無更新 / 驗證失敗" --> Boot0{4. 驗證 Slot 0 簽章}
+    S1 -- "未按 S1 (正常啟動)" --> HeaderObj{2. 檢查 Slot 2 簽章}
+    HeaderObj -- "驗證通過 (Direct XIP)" --> JumpSlot2[跳轉至 0x100100]
+    HeaderObj -- "無更新 / 驗證失敗" --> Boot0{4. 驗證 Slot 1 簽章}
     
-    Swap_Op --> Boot0
-    
-    Boot0 -- "驗證通過" --> Jump[5. 更新 VTOR 並跳轉至 0x8100]
+    Boot0 -- "驗證通過" --> JumpApp1
     Boot0 -- "驗證失敗" --> Halt[系統停止 / 紅燈告警]
 
-    subgraph "Application 運行環境 (Slot 0)"
-    Jump --> Run[應用程式正常執行]
+    subgraph "Application 運行環境"
+    JumpApp1 --> Run[App 1 正常執行]
     Run --> Incoming[接收網路 OTA 封包]
-    Incoming --> FlashWrite[寫入 Secondary Slot - 1MB 處]
-    FlashWrite --> SetPending[設定重置後更新標記]
-    SetPending --> Reboot[執行系統重置]
+    Incoming --> FlashWrite[寫入 Slot 2 - 0x100000 處]
+    FlashWrite --> Reboot[執行系統重置]
     Reboot --> Power
     end
 ```
 
 ---
-
-
 
 ## 🛠️ 專案開發進度 (To-Do List)
 
@@ -101,8 +135,8 @@ graph TD
 - [x] **LED 偵測**：完成 P006~P008 腳位配置與閃燈測試。
 - [x] **網路服務**：實作 TCP Server (Port 8080) 用於接收 OTA 資料。
 - [x] **Flash 寫入**：實作分塊寫入邏輯，成功避開 Dual Mode 斷層。
-- [ ] **韌體切換**：實作 Bank Swap 或 MCUboot 觸發邏輯。
-- [ ] **狀態更新**：在重置前標記「更新待處理 (Pending)」旗標。
+- [x] **韌體切換**：實作 Direct XIP 模式成功。
+- [x] **防磚機制**：實作 S1 按鍵強制 Fallback 成功。
 
 ---
 
@@ -115,32 +149,31 @@ graph TD
 *   板子 IP 預設為 `192.168.1.100`，監聽端口 `8080`。
 
 ### 2. 電腦端傳送
-使用專案根目錄下的 `ota_client.py` 進行傳送：
-```bash
-# 發送測試資料 (64KB)
-python ota_client.py 192.168.1.100
-
-# 發送特定韌體檔案
-python ota_client.py 192.168.1.100 your_firmware.bin
-```
+使用專案根目錄下的 `ota_ui.py` 進行傳送：
+1. 選擇簽署好的檔案（例如 `ra_primary_app.bin.signed`）。
+2. 輸入板子 IP `192.168.1.100`。
+3. 點擊「傳送」，進度條走完後等待板子結算。
 
 ### 3. 驗證方式
 *   傳送時，板子 **藍燈 (P006)** 會閃爍。
-*   傳送完成後，板子會自動讀取開頭資料。如果正確，**紅綠藍三燈會齊亮 5 秒**。
-*   在 e2 studio 中檢查位址 **`0x200000`** 或 **`0x210000`** 即可看到資料。
+*   傳送完成後，板子會自動結算並重置。
 
 ---
 
 ## 📝 修復日誌 (Troubleshooting)
+
 - **Problem**: 乙太網路 Ping 不通。
 - **Solution**: 開啟 IOPORT (R_IOPORT_Open) 並將 MSTPCRB 的 bit 15 設為 0 以啟動 ETHERC 模組。
+
 - **Problem**: Linker Overflow。
 - **Solution**: 在 Solution Memories 中手動劃分 Secure 區域，確保 BL 與 App 位址不衝突。
+
 - **Problem**: **[TrustZone] 網路連線 10 秒後斷線，且 ARP 通但 Ping 不通。**
 - **Solution**: 
     1. **記憶體牆修復**：將 Ethernet 描述符與封包池強制搬移至 `.ns_buffer` 段（Non-secure RAM），防止 EDMAC 觸發 ADE 錯誤。
     2. **搬運工權限解鎖**：在啟動時手動修改 `PSARB` (bit 15) 與 `PSARC` (bit 15) 以解鎖 ETHERC 與 EDMAC 的存取權限。
     3. **MAC 位址同步**：確保 FreeRTOS+TCP 堆疊 MAC 與硬體暫存器 MAC 完全一致（同步為 `00:11:22:33:44:55`），防止硬體過濾器誤殺單播封包。
+
 - **Problem**: **[Flash] 調用 R_FLASH_HP_Erase 報錯 FSP_ERR_ERASE_FAILED (0x10004)。**
 - **Solution**: 
     1. **硬體權限解鎖**：RA6M5 硬體預設鎖定 Flash 控制器，需手動解鎖 `PSARA` (bit 10) 暫存器權限。
@@ -226,3 +259,18 @@ python ota_client.py 192.168.1.100 your_firmware.bin
 ### 4. 待解決的關鍵問題
 * **坑 ①**：App 2 的編譯位址必須改成 `0x200000` (修改 `fsp.lld` 的 `FLASH_START`)。
 * **坑 ②**：確認 App 1 接收檔案寫入 `0x200000` 的 Trailer 格式是否能被 BL 認可。
+
+---
+
+## 🎉 終極勝利：Direct XIP 成功運作與 S1 Fallback Bug 修復 (2026-05-13)
+
+我們成功解決了最後的跳轉死機與向量表亂碼問題，達成全功能 OTA：
+
+### 1. Direct XIP 模式實測成功
+* **成果**：在 `fsp.lld` 中強行指定 `FLASH_START = 0x100100`，並將 App 版本切換至 2（開啟跑馬燈）。傳送後 MCUboot 成功驗證並跳轉至 `0x100100`，**跑馬燈順利執行**！
+* **備註**：先前預期需要編譯在 `0x200000`，但實測發現 MCUboot 會直接跳轉到 Slot 2 的物理起點 `0x100000`，因此將 `FLASH_START` 設為 **`0x100100`** 才是正確的做法！
+
+### 2. 修復 S1 Fallback 向量表亂碼 Bug
+* **問題**：按下 S1 強制救援時，UART 顯示向量表為 `0xc74d`（亂碼），導致 PC 跳到非法位址而死機，甚至導致 J-Link 無法連線。
+* **原因**：在 `hal_entry.c` 中，我們將 `rsp.br_hdr` 設為 `NULL`，導致系統解引用 NULL 讀到髒資料。
+* **解決方法**：將 `rsp.br_hdr` 改為 `(void *)0x8000`，讓它去讀取 Slot 1 現有的 Header，就能正確算出 `0x8100` 的向量表，順利回到 App 1！
