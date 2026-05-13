@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 /* --- 版本開關 --- */
-#define CURRENT_APP_VERSION 1 /* 1: 舊版 (原功能), 2: 新版 (跑馬燈功能) */
+#define CURRENT_APP_VERSION 3 /* 1: 舊版 (原功能), 2: 新版 (跑馬燈功能), 3: App 3 (跑馬燈+資訊查詢) */
 
 /* --- OTA 設定 --- */
 #define OTA_FLASH_START_ADDR                                                   \
@@ -59,8 +59,8 @@ void vApplicationPingReplyHook(ePingReplyStatus_t eStatus,
 
 void flash_0_cb(flash_callback_args_t *p_args) { (void)p_args; }
 
-#if (CURRENT_APP_VERSION == 2)
-/* App 2 專用的跑馬燈 Task */
+#if (CURRENT_APP_VERSION == 2 || CURRENT_APP_VERSION == 3)
+/* App 2/3 專用的跑馬燈 Task */
 void marquee_task(void *pvParameters) {
   (void)pvParameters;
   while (1) {
@@ -124,7 +124,7 @@ void new_thread0_entry(void *pvParameters) {
   }
   LED_GREEN_ON; /* 拿到 IP，綠燈亮起 */
 
-#if (CURRENT_APP_VERSION == 2)
+#if (CURRENT_APP_VERSION == 2 || CURRENT_APP_VERSION == 3)
   /* 啟動跑馬燈任務 */
   xTaskCreate(marquee_task, "Marquee", 512, NULL, 1, NULL);
 #endif
@@ -152,6 +152,18 @@ void new_thread0_entry(void *pvParameters) {
 
         if (lBytesReceived > 0) {
           g_buffer_index += (uint32_t)lBytesReceived;
+
+          /* --- 支援網路指令：查詢資訊 (App 3) --- */
+          if (g_buffer_index >= 4 && memcmp(g_ota_buffer, "INFO", 4) == 0) {
+              #if (CURRENT_APP_VERSION == 3)
+              char info_reply[] = "App 3 (Marquee + Info) is running!\n";
+              #else
+              char info_reply[] = "App 1/2 is running!\n";
+              #endif
+              FreeRTOS_send(xConnectedSocket, info_reply, strlen(info_reply), 0);
+              g_buffer_index = 0; /* 清空緩衝區 */
+              continue;
+          }
 
           /* --- 支援網路指令：設定檔案大小 --- */
           if (g_buffer_index >= 5 && memcmp(g_ota_buffer, "SIZE:", 5) == 0) {
@@ -188,7 +200,7 @@ void new_thread0_entry(void *pvParameters) {
           while (g_buffer_index >= 128) {
             /* 限制寫入長度，不要跨越 32KB Block 邊界 */
             uint32_t space_in_block = FLASH_BLOCK_SIZE - (u32WriteAddr % FLASH_BLOCK_SIZE);
-            uint32_t write_len = g_buffer_index & ~127; /* 長度對齊 128 */
+            uint32_t write_len = g_buffer_index & ~127U; /* 長度對齊 128 */
             
             if (write_len > space_in_block) {
                 write_len = space_in_block; /* 縮減長度到剛好填滿目前 block */
@@ -219,14 +231,14 @@ void new_thread0_entry(void *pvParameters) {
               if (g_received_bytes - last_prog >= 102400) {
                   char prog_reply[32];
                   int p_len = snprintf(prog_reply, sizeof(prog_reply), "PROG:%lu\n", (unsigned long)g_received_bytes);
-                  FreeRTOS_send(xConnectedSocket, prog_reply, p_len, 0);
+                  FreeRTOS_send(xConnectedSocket, prog_reply, (size_t)p_len, 0);
                   last_prog = g_received_bytes;
               }
             } else {
               /* 寫入失敗！透過網路回傳錯誤代碼 */
               char err_reply[32];
               int err_len = snprintf(err_reply, sizeof(err_reply), "WRITE_ERR:%d\n", (int)g_flash_write_err);
-              FreeRTOS_send(xConnectedSocket, err_reply, err_len, 0);
+              FreeRTOS_send(xConnectedSocket, err_reply, (size_t)err_len, 0);
               break; /* 發生錯誤，跳出寫入迴圈 */
             }
             
@@ -239,13 +251,13 @@ void new_thread0_entry(void *pvParameters) {
               /* 假定傳送結束 */
               char done_reply[64];
               int d_len = snprintf(done_reply, sizeof(done_reply), "DONE:%lu\n", (unsigned long)g_received_bytes);
-              FreeRTOS_send(xConnectedSocket, done_reply, d_len, 0);
+              FreeRTOS_send(xConnectedSocket, done_reply, (size_t)d_len, 0);
               
               uint32_t calculated_crc = calculate_crc32((const uint8_t *)OTA_FLASH_START_ADDR, g_received_bytes);
               
               char reply[64];
               int reply_len = snprintf(reply, sizeof(reply), "CRC:%08X\n", (unsigned int)calculated_crc);
-              FreeRTOS_send(xConnectedSocket, reply, reply_len, 0);
+              FreeRTOS_send(xConnectedSocket, reply, (size_t)reply_len, 0);
               
               /* 觸發驗證與亮燈 */
 #if (CURRENT_APP_VERSION == 1)

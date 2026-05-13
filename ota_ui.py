@@ -37,6 +37,8 @@ class OTAClientUI:
         self.erase_btn.pack(side=tk.LEFT, padx=10)
         self.send_btn = tk.Button(btn_frame, text="2. SEND FILE", command=self.start_send, bg="#ccffcc")
         self.send_btn.pack(side=tk.LEFT, padx=10)
+        self.query_btn = tk.Button(btn_frame, text="3. QUERY INFO", command=self.start_query, bg="#cceeff")
+        self.query_btn.pack(side=tk.LEFT, padx=10)
         
         # Progress
         tk.Label(root, text="Progress:").pack(pady=5)
@@ -120,6 +122,39 @@ class OTAClientUI:
             messagebox.showerror("Error", str(e))
         finally:
             self.erase_btn.config(state=tk.NORMAL)
+            
+    def start_query(self):
+        ip = self.ip_entry.get()
+        self.set_status("Querying Info...", "orange")
+        self.log(f"Connecting to {ip}:8080 for Info...")
+        self.query_btn.config(state=tk.DISABLED)
+        
+        threading.Thread(target=self.run_query, args=(ip,)).start()
+        
+    def run_query(self, ip):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(5)
+            s.connect((ip, DEFAULT_PORT))
+            
+            self.log("[TX] Sending command: INFO")
+            s.sendall(b"INFO")
+            
+            self.log("Waiting for response...")
+            resp = s.recv(1024)
+            s.close()
+            
+            self.log(f"[RX] Received: {resp.decode()}")
+            
+            self.set_status("Query Successful!", "green")
+            self.log(f"Board Info: {resp.decode()}")
+            messagebox.showinfo("Board Info", resp.decode())
+        except Exception as e:
+            self.set_status("Error occurred", "red")
+            self.log(f"Error: {e}")
+            messagebox.showerror("Error", str(e))
+        finally:
+            self.query_btn.config(state=tk.NORMAL)
             
     def start_send(self):
         ip = self.ip_entry.get()
