@@ -1,6 +1,8 @@
 /* generated configuration header file - do not edit */
 #ifndef MCUBOOT_LOGGING_H_
 #define MCUBOOT_LOGGING_H_
+
+extern void uart9_printf(const char *format, ...);
 #ifndef __MCUBOOT_LOGGING_H__
 #define __MCUBOOT_LOGGING_H__
 
@@ -33,7 +35,7 @@ extern "C" {
 
 #ifndef MCUBOOT_LOG_ERR
 #if MCUBOOT_LOG_LEVEL >= MCUBOOT_LOG_LEVEL_ERROR
-#define MCUBOOT_LOG_ERR(_fmt, ...)           printf("[ERR] " _fmt "\n", ## __VA_ARGS__)
+#define MCUBOOT_LOG_ERR(_fmt, ...)           uart9_printf("[ERR] " _fmt "\n", ## __VA_ARGS__)
 #else
   #define MCUBOOT_LOG_ERR(...)                 IGNORE(__VA_ARGS__)
  #endif
@@ -41,7 +43,7 @@ extern "C" {
 
 #ifndef MCUBOOT_LOG_WRN
 #if MCUBOOT_LOG_LEVEL >= MCUBOOT_LOG_LEVEL_WARNING
-#define MCUBOOT_LOG_WRN(_fmt, ...)    printf("[WRN] " _fmt "\n", ## __VA_ARGS__)
+#define MCUBOOT_LOG_WRN(_fmt, ...)    uart9_printf("[WRN] " _fmt "\n", ## __VA_ARGS__)
 #else
   #define MCUBOOT_LOG_WRN(...)          IGNORE(__VA_ARGS__)
  #endif
@@ -49,7 +51,7 @@ extern "C" {
 
 #ifndef MCUBOOT_LOG_INF
 #if MCUBOOT_LOG_LEVEL >= MCUBOOT_LOG_LEVEL_INFO
-#define MCUBOOT_LOG_INF(_fmt, ...)    printf("[INF] " _fmt "\n", ## __VA_ARGS__)
+#define MCUBOOT_LOG_INF(_fmt, ...)    uart9_printf("[INF] " _fmt "\n", ## __VA_ARGS__)
 #else
   #define MCUBOOT_LOG_INF(...)          IGNORE(__VA_ARGS__)
  #endif
@@ -57,7 +59,7 @@ extern "C" {
 
 #ifndef MCUBOOT_LOG_DBG
 #if MCUBOOT_LOG_LEVEL >= MCUBOOT_LOG_LEVEL_DEBUG
-#define MCUBOOT_LOG_DBG(_fmt, ...)    printf("[DBG] " _fmt "\n", ## __VA_ARGS__)
+#define MCUBOOT_LOG_DBG(_fmt, ...)    uart9_printf("[DBG] " _fmt "\n", ## __VA_ARGS__)
 #else
   #define MCUBOOT_LOG_DBG(...)          IGNORE(__VA_ARGS__)
  #endif

@@ -2,13 +2,14 @@
 #include "FreeRTOS_Sockets.h"
 #include "new_thread0.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* --- 版本開關 --- */
 #define CURRENT_APP_VERSION 1 /* 1: 舊版 (原功能), 2: 新版 (跑馬燈功能) */
 
 /* --- OTA 設定 --- */
 #define OTA_FLASH_START_ADDR                                                   \
-  (0x200000)                     /* OTA 韌體存放起點 (Bank 1 內部位址)       \
+  (0x100000)                     /* OTA 韌體存放起點 (倉庫位址)              \
                                   */
 #define FLASH_BLOCK_SIZE (32768) /* RA6M5 大區塊為 32KB */
 
@@ -31,7 +32,23 @@ volatile uint32_t g_fawmon = 0;
 volatile uint32_t g_fbankmon = 0;
 
 /* --- 診斷與緩存 --- */
-static uint8_t g_ota_buffer[4096]; /* 接收快取 */
+static uint32_t g_ota_buffer[1024]; /* 接收快取，使用 uint32_t 確保 4-byte 對齊 */
+static uint32_t g_expected_file_size = 0;
+static uint32_t g_received_bytes = 0;
+static uint32_t g_buffer_index = 0;
+
+/* --- CRC32 計算函數 --- */
+uint32_t calculate_crc32(const uint8_t *data, size_t len) {
+    uint32_t crc = 0xFFFFFFFF;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1) crc = (crc >> 1) ^ 0xEDB88320;
+            else crc >>= 1;
+        }
+    }
+    return ~crc;
+}
 
 /* --- 必要的鉤子函數 (Hooks) --- */
 void vApplicationPingReplyHook(ePingReplyStatus_t eStatus,
@@ -72,7 +89,7 @@ void new_thread0_entry(void *pvParameters) {
   Socket_t xListeningSocket, xConnectedSocket;
   struct freertos_sockaddr xBindAddress;
   socklen_t xSize = sizeof(xBindAddress);
-  static const TickType_t xReceiveTimeOut = portMAX_DELAY;
+  static const TickType_t xReceiveTimeOut = pdMS_TO_TICKS(5000); /* 5 秒超時，用於觸發傳送結束 */
   int32_t lBytesReceived;
   uint32_t u32WriteAddr = OTA_FLASH_START_ADDR;
 
@@ -123,26 +140,42 @@ void new_thread0_entry(void *pvParameters) {
     /* 等待連線 */
     xConnectedSocket = FreeRTOS_accept(xListeningSocket, &xBindAddress, &xSize);
     if (xConnectedSocket != FREERTOS_INVALID_SOCKET) {
+      /* 還原為阻塞模式，使用 OS 的超時設定 */
       FreeRTOS_setsockopt(xConnectedSocket, 0, FREERTOS_SO_RCVTIMEO,
                           &xReceiveTimeOut, sizeof(xReceiveTimeOut));
       u32WriteAddr = OTA_FLASH_START_ADDR;
 
       while (1) {
         /* 接收資料 */
-        lBytesReceived = FreeRTOS_recv(xConnectedSocket, g_ota_buffer,
-                                       sizeof(g_ota_buffer), 0);
+        lBytesReceived = FreeRTOS_recv(xConnectedSocket, ((uint8_t *)g_ota_buffer) + g_buffer_index,
+                                       sizeof(g_ota_buffer) - g_buffer_index, 0);
 
         if (lBytesReceived > 0) {
+          g_buffer_index += (uint32_t)lBytesReceived;
+
+          /* --- 支援網路指令：設定檔案大小 --- */
+          if (g_buffer_index >= 5 && memcmp(g_ota_buffer, "SIZE:", 5) == 0) {
+              /* 讀取冒號後面的數字 */
+              g_expected_file_size = (uint32_t)strtoul((char *)g_ota_buffer + 5, NULL, 10);
+              g_received_bytes = 0;
+              g_buffer_index = 0; /* 清空緩衝區，因為指令已處理 */
+              
+              /* 回傳 ACK 讓 Python 知道可以開始傳檔案 */
+              FreeRTOS_send(xConnectedSocket, "SIZE_OK", 7, 0);
+              continue;
+          }
+
           /* --- 支援網路指令：清除 Bank 1 --- */
-          if (lBytesReceived == 5 && memcmp(g_ota_buffer, "ERASE", 5) == 0) {
+          if (g_buffer_index >= 5 && memcmp(g_ota_buffer, "ERASE", 5) == 0) {
             LED_BLUE_ON;
             __disable_irq();
-            /* 擦除 0x200000 開始的 31 個 32KB 區塊 (共 992KB) */
+            /* 擦除 0x100000 開始的 31 個 32KB 區塊 (共 992KB) */
             g_flash_erase_err =
                 R_FLASH_HP_Erase(&g_flash0_ctrl, OTA_FLASH_START_ADDR, 31);
             __enable_irq();
             LED_BLUE_OFF;
 
+            g_buffer_index = 0; /* 重置緩衝區 */
             if (FSP_SUCCESS == g_flash_erase_err) {
               FreeRTOS_send(xConnectedSocket, "ERASE_OK", 8, 0);
             } else {
@@ -150,78 +183,88 @@ void new_thread0_entry(void *pvParameters) {
             }
             continue; /* 繼續等待資料或斷線 */
           }
-          LED_BLUE_ON; /* 寫入時藍燈亮 */
 
-          /* 每到區塊邊界就自動擦除 32KB */
-          if (u32WriteAddr % FLASH_BLOCK_SIZE == 0) {
-            __disable_irq();
-            g_flash_erase_err =
-                R_FLASH_HP_Erase(&g_flash0_ctrl, u32WriteAddr, 1);
-            __enable_irq();
-          }
-
-          /* 寫入 Flash (長度對齊 128) */
-          uint32_t u32WriteLen = (uint32_t)((lBytesReceived + 127) & ~127);
-          __disable_irq();
-          g_flash_write_err =
-              R_FLASH_HP_Write(&g_flash0_ctrl, (uint32_t)g_ota_buffer,
-                               u32WriteAddr, u32WriteLen);
-          __enable_irq();
-
-          if (FSP_SUCCESS == g_flash_write_err) {
-            u32WriteAddr += u32WriteLen;
-          }
-
-          LED_BLUE_OFF;
-        } else if (lBytesReceived < 0) {
-          /* 連線中斷，代表傳送結束 */
-          FreeRTOS_closesocket(xConnectedSocket);
-
-#if (CURRENT_APP_VERSION == 1)
-          /* --- 自動驗證：檢查 MCUboot 簽署檔的 Magic Number --- */
-          uint32_t *p_magic = (uint32_t *)OTA_FLASH_START_ADDR;
-          if (*p_magic == 0x96f3b83d) {
-            /* --- 寫入 MCUboot 更新標記 (Trailer) --- */
-            uint8_t trailer_buf[128];
-            uint32_t trailer_addr = OTA_FLASH_START_ADDR + 0xF8000 - 128;
-            memcpy(trailer_buf, (void *)trailer_addr, 128);
-
-            uint8_t magic[16] = {0x77, 0xc4, 0x3c, 0x09, 0x04, 0xa6,
-                                 0x12, 0x03, 0x8f, 0x8d, 0x28, 0xb9,
-                                 0x5b, 0xa4, 0xa9, 0x86};
-            memcpy(&trailer_buf[128 - 16], magic, 16);
-
-            /* 補上 Image OK 旗標 (倒數第 17 byte) */
-            trailer_buf[128 - 17] = 0x01;
+          /* --- 流式寫入 Flash (維持 128 Byte 對齊且不跨 32KB Block) --- */
+          while (g_buffer_index >= 128) {
+            /* 限制寫入長度，不要跨越 32KB Block 邊界 */
+            uint32_t space_in_block = FLASH_BLOCK_SIZE - (u32WriteAddr % FLASH_BLOCK_SIZE);
+            uint32_t write_len = g_buffer_index & ~127; /* 長度對齊 128 */
             
-            /* 補上 Swap Info 旗標 (倒數第 19 byte)，設為 0x01 代表 Test */
-            trailer_buf[128 - 19] = 0x01;
+            if (write_len > space_in_block) {
+                write_len = space_in_block; /* 縮減長度到剛好填滿目前 block */
+            }
+            
+            /* 如果 write_len 為 0，代表我們需要換 block 或是資料不夠 128 */
+            if (write_len == 0) {
+                break; /* 等待更多資料 */
+            }
 
             __disable_irq();
-            g_flash_write_err = R_FLASH_HP_Write(
-                &g_flash0_ctrl, (uint32_t)trailer_buf, trailer_addr, 128);
+            g_flash_write_err =
+                R_FLASH_HP_Write(&g_flash0_ctrl, (uint32_t)g_ota_buffer,
+                                 u32WriteAddr, write_len);
             __enable_irq();
 
-            /* 驗證成功：三燈齊亮 5 秒 */
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06,
-                              BSP_IO_LEVEL_HIGH);
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07,
-                              BSP_IO_LEVEL_HIGH);
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08,
-                              BSP_IO_LEVEL_HIGH);
+            if (FSP_SUCCESS == g_flash_write_err) {
+              u32WriteAddr += write_len;
+              g_received_bytes += write_len;
 
-            vTaskDelay(pdMS_TO_TICKS(5000));
-
-            /* 熄滅 */
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06,
-                              BSP_IO_LEVEL_LOW);
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07,
-                              BSP_IO_LEVEL_LOW);
-            R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08,
-                              BSP_IO_LEVEL_LOW);
+              /* 移出已處理的資料 */
+              memmove(g_ota_buffer, g_ota_buffer + write_len,
+                      g_buffer_index - write_len);
+              g_buffer_index -= write_len;
+              
+              /* 每寫入約 100KB 就回傳進度 */
+              static uint32_t last_prog = 0;
+              if (g_received_bytes - last_prog >= 102400) {
+                  char prog_reply[32];
+                  int p_len = snprintf(prog_reply, sizeof(prog_reply), "PROG:%lu\n", (unsigned long)g_received_bytes);
+                  FreeRTOS_send(xConnectedSocket, prog_reply, p_len, 0);
+                  last_prog = g_received_bytes;
+              }
+            } else {
+              /* 寫入失敗！透過網路回傳錯誤代碼 */
+              char err_reply[32];
+              int err_len = snprintf(err_reply, sizeof(err_reply), "WRITE_ERR:%d\n", (int)g_flash_write_err);
+              FreeRTOS_send(xConnectedSocket, err_reply, err_len, 0);
+              break; /* 發生錯誤，跳出寫入迴圈 */
+            }
+            
+            /* 在每次寫入 128 Byte 間稍微讓出時間給 Ethernet 中斷 */
+            vTaskDelay(pdMS_TO_TICKS(1));
           }
+        } else if (lBytesReceived <= 0) {
+          /* 連線中斷 (收到了 FIN 或是出錯) 或超時 */
+          if (g_expected_file_size > 0 && g_received_bytes > 100000) {
+              /* 假定傳送結束 */
+              char done_reply[64];
+              int d_len = snprintf(done_reply, sizeof(done_reply), "DONE:%lu\n", (unsigned long)g_received_bytes);
+              FreeRTOS_send(xConnectedSocket, done_reply, d_len, 0);
+              
+              uint32_t calculated_crc = calculate_crc32((const uint8_t *)OTA_FLASH_START_ADDR, g_received_bytes);
+              
+              char reply[64];
+              int reply_len = snprintf(reply, sizeof(reply), "CRC:%08X\n", (unsigned int)calculated_crc);
+              FreeRTOS_send(xConnectedSocket, reply, reply_len, 0);
+              
+              /* 觸發驗證與亮燈 */
+#if (CURRENT_APP_VERSION == 1)
+              uint32_t *p_magic = (uint32_t *)OTA_FLASH_START_ADDR;
+              if (*p_magic == 0x96f3b83d) {
+                /* 亮三顆燈 5 秒 */
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06, BSP_IO_LEVEL_HIGH);
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_HIGH);
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08, BSP_IO_LEVEL_HIGH);
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_06, BSP_IO_LEVEL_LOW);
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_07, BSP_IO_LEVEL_LOW);
+                R_IOPORT_PinWrite(&g_ioport_ctrl, BSP_IO_PORT_00_PIN_08, BSP_IO_LEVEL_LOW);
+              }
 #endif
-          break;
+              g_expected_file_size = 0;
+          }
+          FreeRTOS_closesocket(xConnectedSocket);
+          break; /* 結束接收迴圈 */
         }
       }
     }

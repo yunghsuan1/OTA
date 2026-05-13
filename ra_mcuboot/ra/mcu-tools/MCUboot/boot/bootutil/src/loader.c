@@ -1025,7 +1025,8 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
     }
     if (!boot_is_header_valid(hdr, fap) || FIH_NOT_EQ(fih_rc, FIH_SUCCESS)) {
         if ((slot != BOOT_PRIMARY_SLOT) || ARE_SLOTS_EQUIVALENT()) {
-            flash_area_erase(fap, 0, flash_area_get_size(fap));
+            /* 👈 為了除錯，我們把這行註解掉，防止 MCUboot 把失敗的 Slot 1 清掉 */
+            /* flash_area_erase(fap, 0, flash_area_get_size(fap)); */
             /* Image is invalid, erase it to prevent further unnecessary
              * attempts to validate and boot it.
              */

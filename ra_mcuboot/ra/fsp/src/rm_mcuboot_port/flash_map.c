@@ -118,7 +118,7 @@ static const struct flash_area flash_map[] =
     {
         .fa_id        = FLASH_AREA_0S_ID,
         .fa_device_id = FLASH_DEVICE_INTERNAL_FLASH,
-        .fa_off       = 0x200000, /* 👈 強行導向 Bank 1 起點 */
+        .fa_off       = 0x100000, /* 👈 導向 Slot 1 起點 (Linear 模式) */
         .fa_size      = BSP_PARTITION___BL_0_S_H_SIZE + BSP_PARTITION___BL_0_S_I_SIZE + BSP_PARTITION_FLASH_CPU0_C_SIZE,
     },
 };

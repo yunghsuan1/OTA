@@ -48,13 +48,13 @@ FSP Configuration
     OFS Registers: OFS0 (Option Function Select Register 0) Settings: WDT: Window Start Position: 100% (no window start position)
     OFS Registers: OFS0 (Option Function Select Register 0) Settings: WDT: Reset Interrupt Request: Reset
     OFS Registers: OFS0 (Option Function Select Register 0) Settings: WDT: Stop Control: Stop counting when entering Sleep mode
-    OFS Registers: DUALSEL (Dual Mode Select Register) Settings: Disabled
+    OFS Registers: DUALSEL (Dual Mode Select Register) Settings: Enabled
     OFS Registers: DUALSEL (Dual Mode Select Register) Settings: Bank Mode: Linear
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: Enabled
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: Voltage Detection 0 Circuit Start: Voltage monitor 0 reset is disabled after reset
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: Voltage Detection 0 Level: 2.80 V
     OFS Registers: OFS1 (Option Function Select Register 1) Settings: HOCO Oscillation Enable: HOCO oscillation is disabled after reset
-    OFS Registers: BANKSEL (Bank Select Register) Settings: Enabled
+    OFS Registers: BANKSEL (Bank Select Register) Settings: Disabled
     OFS Registers: BANKSEL (Bank Select Register) Settings: Startup Bank Switch: Disabled
     OFS Registers: BANKSEL (Bank Select Register) Settings: Block Swap Select: Disabled
     OFS Registers: BPS (Block Protect Setting Register) Settings: Disabled

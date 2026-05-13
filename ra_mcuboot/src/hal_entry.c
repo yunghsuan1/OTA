@@ -101,9 +101,25 @@ void mcuboot_quick_setup()
     
     uart9_print("[INFO] Calling boot_go()...\r\n");
 
-    if (0 != boot_go(&rsp))
+    /* 檢查 Slot 1 (0x100000) 的開頭資料 */
+    uint32_t *p_slot1 = (uint32_t *)0x100000;
+    uart9_printf("[DEBUG] Slot 1 (0x100000) Magic: 0x%08X\r\n", *p_slot1);
+
+    /* 印出內建的公鑰 */
+    #include "bootutil/sign_key.h"
+    extern const struct bootutil_key bootutil_keys[];
+    
+    uart9_printf("[DEBUG] MCUboot Key Len: %d\r\n", *bootutil_keys[0].len);
+    uart9_printf("[DEBUG] MCUboot Key: ");
+    for (unsigned int i = 0; i < *bootutil_keys[0].len; i++) {
+        uart9_printf("%02X ", bootutil_keys[0].key[i]);
+    }
+    uart9_printf("\r\n");
+
+    int boot_err = boot_go(&rsp);
+    if (0 != boot_err)
     {
-        uart9_print("[ERROR] MCUboot Verification Failed!\r\n");
+        uart9_printf("[ERROR] MCUboot Verification Failed! Err Code: %d\r\n", boot_err);
 
         /* Verification Failed: Red LED On, Blue Off */
         R_IOPORT_PinWrite(&g_ioport_ctrl, LED_BLUE, BSP_IO_LEVEL_LOW);

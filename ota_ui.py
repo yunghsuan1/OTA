@@ -146,6 +146,25 @@ class OTAClientUI:
             sent_size = 0
             self.log(f"File size: {total_size} Bytes. Starting transmission...")
             
+            # 發送檔案大小
+            size_cmd = f"SIZE:{total_size}\n"
+            s.sendall(size_cmd.encode('utf-8'))
+            self.log(f"[TX] Sent size command: {size_cmd.strip()}")
+            
+            # 等待板子確認
+            try:
+                s.settimeout(5.0)
+                resp = s.recv(1024).decode('utf-8')
+                if "SIZE_OK" not in resp:
+                    self.log(f"[RX] Error: Board did not ack size. Got: {resp}")
+                    s.close()
+                    return
+                self.log("[RX] Board acknowledged size.")
+            except Exception as e:
+                self.log(f"Failed to get SIZE_OK: {e}")
+                s.close()
+                return
+                
             with open(file_path, "rb") as f:
                 while True:
                     data = f.read(1024)
@@ -154,13 +173,74 @@ class OTAClientUI:
                     s.sendall(data)
                     sent_size += len(data)
                     
+                    import time
+                    time.sleep(0.035) # 延遲 35ms，避免衝太快板子來不及處理
+                    
                     percent = (sent_size / total_size) * 100
                     self.progress['value'] = percent
                     self.set_status(f"Sending: {sent_size}/{total_size} Bytes ({percent:.1f}%)", "orange")
                     
+            # 檔案傳送完畢，等待板子超時結算 (不發送 FIN，避免 FreeRTOS 斷線)
+            self.log("[TX] File sent. Waiting for board to timeout and reply...")
+                    
+            # 接收板子回傳的 CRC 驗證結果
+            try:
+                self.log("Waiting for board to verify CRC...")
+                s.settimeout(20.0)
+                
+                full_reply = ""
+                while True:
+                    try:
+                        reply = s.recv(1024).decode('utf-8')
+                        if not reply:
+                            break
+                        full_reply += reply
+                        
+                        # 解析並列印進度
+                        lines = reply.strip().split('\n')
+                        for line in lines:
+                            if line.startswith("PROG:"):
+                                self.log(f"[RX] {line}")
+                                
+                        if "CRC:" in full_reply:
+                            break
+                    except socket.timeout:
+                        self.log("Timeout waiting for more data from board.")
+                        break
+                
+                # 從 full_reply 中找出 CRC
+                reply = ""
+                lines = full_reply.strip().split('\n')
+                for line in lines:
+                    if line.startswith("CRC:"):
+                        reply = line
+                        break
+                
+                if not reply:
+                    reply = full_reply.strip() # Fallback
+                    
+                self.log(f"[RX] Board Reply: {reply}")
+                
+                # 電腦端也計算一次 CRC32
+                import zlib
+                with open(file_path, "rb") as f:
+                    file_data = f.read()
+                local_crc = zlib.crc32(file_data) & 0xFFFFFFFF
+                self.log(f"Local CRC: {local_crc:08X}")
+                
+                if f"CRC:{local_crc:08X}" in reply:
+                    self.log("CRC Verification PASSED! 資料完整無缺。")
+                    self.set_status("Success: CRC Verified!", "green")
+                else:
+                    self.log("CRC Verification FAILED! 資料可能毀損。")
+                    self.set_status("Error: CRC Mismatch!", "red")
+                    
+            except Exception as e:
+                self.log(f"Failed to receive CRC or timeout: {e}")
+                
             s.close()
-            self.set_status("File Sent Successfully!", "green")
             self.log("[TX] All data sent successfully!")
+            self.log("Notice: Remember to manually Reset the board to apply update.")
             self.log("Notice: Remember to manually Reset the board to apply update.")
             messagebox.showinfo("Success", "File Sent Successfully!\nRemember to manually Reset the board.")
         except Exception as e:
